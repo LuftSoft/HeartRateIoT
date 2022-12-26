@@ -65,5 +65,6 @@ const config = {
     }
 }
 // render
+// document.querySelector('#btn_start_program').onclick = () => { alert('click') }
 const ctx = document.getElementById('myChart')
 const myChart = new Chart(ctx, config)

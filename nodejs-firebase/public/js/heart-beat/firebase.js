@@ -2,7 +2,7 @@ import { MIN_BEAT, MAX_BEAT } from './constants.js';
 import { showToastMessage, closeToastMessage } from './toast-message.js';
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js";
-import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js";
+import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js";
 // import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-analytics.js";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -24,7 +24,36 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
 const starCountRef = ref(db, 'heart/realtime');
+//
+var btnStartStatus = 0
+$('#btn_start_program').click(() => {
+	if (btnStartStatus == 0) {
+		set(ref(db, 'heart/init'), { run: 1 })
+		$('#btn_start_program').prop('innerText', 'Tạm dừng');
+		btnStartStatus = 1;
+	} else {
+		set(ref(db, 'heart/init'), { run: 0 })
+		$('#btn_start_program').prop('innerText', 'Tiếp tục');
+		btnStartStatus = 0;
+	}
+	// $('#btn_start_program').prop('disabled', true)
+})
+$('#btn_end_program').click(() => {
+	set(ref(db, 'heart/init'), { run: 0 })
+	if (confirm('Bạn có muốn nhận kết quả đo lần này qua mail?')) {
+		location.href = "/sendmail"
+	}
+	else {
+		set(ref(db, 'heart/heartlogs'), {})
+		set(ref(db, 'heart/realtime'), { time: "", heartbeat: "0" })
+		location.reload()
+	}
+})
 
+// window.addEventListener('unload', (e) => {
+
+// })
+//
 function setValueMonitor(beatValue) {
 	var str = '';
 	str = `Nhịp tim: ${beatValue} BPM`;
@@ -91,3 +120,4 @@ function setToolTipGauge(min, max) {
 	document.getElementById('ticks').title = `Nhịp tim có giá trị từ ${min} - ${max} bpm`;
 }
 setToolTipGauge(MIN_BEAT, MAX_BEAT)
+

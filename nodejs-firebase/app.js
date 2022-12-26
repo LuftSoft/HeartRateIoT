@@ -5,7 +5,7 @@ const express = pkg;
 // import { firebase } from "firebase";
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getDatabase, ref, onValue } from "firebase/database";
+import { getDatabase, ref, onValue, set } from "firebase/database";
 import * as csv from "csv";
 import * as fs from "fs";
 import * as parser from 'csv-parse'
@@ -13,6 +13,9 @@ import * as xl from "xlsx";
 import * as ejs from "ejs";
 import path, { dirname } from 'path';
 import { fileURLToPath } from "url";
+import * as nodemailer from "nodemailer";
+import bodyParser from "body-parser";
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename);
 // TODO: Add SDKs for Firebase products that you want to use
@@ -31,7 +34,24 @@ const firebaseConfig = {
     measurementId: "G-ZMEP6HBQ0R"
 };
 
-
+let configOptions = {
+    host: "smtp.example.com",
+    port: 587,
+    tls: {
+        rejectUnauthorized: true,
+        minVersion: "TLSv1.2"
+    }
+}
+let pass = 'agpmmzmqmqqxrcvf'
+const transport = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+        user: "luffschloss@gmail.com",
+        pass: 'agpmmzmqmqqxrcvf'
+    }
+})
 
 // Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);
@@ -50,98 +70,78 @@ const app = express();
 app.set('view engine', 'ejs')
 app.set('views', path.join(__dirname, 'views'))
 // app.engine('ejs', ejs)
-var num = 0;
-setTimeout(() => {
-    num++;
-}, 1000);
+// app.use(bodyParser.json())
+
+// app.use(bodyParser.urlencoded({ extended: false }))
+app.use(express.urlencoded({ extended: true }))
 app.get('/', (req, res) => {
+    console.log(req.query)
     res.render('index/index');
 });
 app.get('/api/get-heart-beat', async (req, res) => {
-
-    onValue(starCountRef, async (snapshot) => {
-        app.locals.data = await snapshot.val();
+    // set(starCountRef, {
+    //     begin: 1
+    // })
+    onValue(ref(db, "heart/heartlogs"), (snapshot) => {
+        app.locals.data = snapshot.val();
     });
+    let obj = app.locals.data
+    var sum = 0, max = 0, min = 1000;
+    for (let k in obj) {
+        let tmp = Number.parseInt(obj[k]);
+        if (!isNaN(tmp)) {
+            sum += tmp;
+            if (max < tmp) max = tmp;
+            if (min > tmp) min = tmp;
+        }
+    }
     res.json({ data: app.locals.data })
 })
+app.get('/sendmail', (req, res) => {
+    res.render('sendemail/sendmail')
+})
+
+app.post('/sendmail', (req, res) => {
+    let mail = req.body.yourEmail
+    onValue(ref(db, 'heart/heartlogs'), (snapshot) => {
+        let obj = snapshot.val()
+        var sum = 0, max = 0, min = 1000, cnt = 0;
+        for (let k in obj) {
+            let tmp = Number.parseInt(obj[k]);
+            if (!isNaN(tmp)) {
+                sum += tmp; cnt++;
+                if (max < tmp) max = tmp;
+                if (min > tmp) min = tmp;
+            }
+        }
+        sum = sum / cnt
+        const mailOption = {
+            from: "luffschloss@gmail.com",
+            to: mail,
+            subject: `Thông báo kết quả đo nhịp tim ngày`,
+            html: `
+        <div>Nhịp tim trung bình: ${sum}</div>
+        <div>Nhịp tim cao nhất: ${max} </div>
+        <div>Nhịp tim thấp nhất: ${min}</div>
+        
+                `
+        }
+        transport.sendMail(mailOption)
+            .then(() => {
+                set(ref(db, 'heart/heartlogs'), {})
+                set(ref(db, 'heart/realtime'), { time: "", heartbeat: "0" })
+
+            })
+            .catch((e) => {
+
+            })
+    });
+    res.redirect('/?success=true')
+})
+
+
 app.use(express.static(__dirname + '/public'))
 app.listen(3222, () => {
     console.log("Open port 3222");
 })
-
-/* 
-Cần làm
-    Chuyển time sang ngày tháng giờ.
-    Có thể có 1 khảo sát nhỏ về tuổi và giới tính để xác định rủi ro về nhịp tim.
-    Tạo 1 dashboard ghi log nhịp tim.
-    Tại 1 giao diện nhỏ hiển thị nhịp tim realtime.
-    https://firebase.google.com/docs/reference/node/firebase.database.DataSnapshot?hl=en&authuser=0
-*/
-/*
-var records = []
-
-var result = []
-fs.createReadStream('./film.csv')
-    .pipe(parser.parse({
-        columns: true
-    }))
-    .on('data', data => {
-        let tmp = {}
-        tmp.Title = data.Title;
-        tmp.Plot = data.Plot;
-        tmp.Director = data.Director;
-        tmp.Genre = data.Genre;
-        tmp.Cast = data.Cast;
-        //console.log(data)
-        records.push(tmp);
-    })
-    .on('error', error => {
-        console.log(error);
-    })
-    .on('end', () => {
-        for (let film of records) {
-            console.log(String(film.Plot).split(" ").length)
-            let plot = String(film.Plot);
-            let header;
-            let sPlot;
-            try {
-                header = plot.split(".")[0] + plot.split(".")[1]
-                sPlot = plot.substring(plot.split(".")[0].length + plot.split(".")[1].length + 1);
-                sPlot = sPlot.trim();
-            } catch (error) {
-                header = plot.split(".")[0]
-                sPlot = plot.substring(plot.split(".")[0].length + 1);
-                sPlot = sPlot.trim();
-            }
-            result.push({ Movie: film.Title, Input: header });
-            let cnt = 0; let len = 0;
-            for (let i = 0; i < 14; i++) {
-                try {
-                    len += sPlot.split(" ")[cnt * 2].length + sPlot.split(" ")[cnt * 2 + 1].length
-                    result.push({ Movie: film.Title, Input: header + sPlot.substring(0, len) });
-                    cnt++;
-                } catch (error) {
-                    result.push({ Movie: film.Title, Input: header + sPlot.substring(0, len) });
-                }
-            }
-            if ((typeof (film.Director) !== 'undefined') && (String(film.Director).toLowerCase() !== 'unknown') && (String(film.Director).trim() !== '')) { result.push({ Movie: film.Title, Input: String(film.Director) }); }
-            else { result.push({ Movie: film.Title, Input: '0' }); }
-            if ((typeof (film.Genre) !== 'undefined') && (String(film.Genre).toLowerCase() !== 'unknown') && (String(film.Genre).trim() !== '')) { result.push({ Movie: film.Title, Input: String(film.Genre) }); }
-            else { result.push({ Movie: film.Title, Input: '0' }); }
-            if ((typeof (film.Cast) !== 'undefined') && (String(film.Cast).toLowerCase() !== 'unknown') && (String(film.Cast).trim() !== '')) { result.push({ Movie: film.Title, Input: String(film.Cast) }); }
-            else { result.push({ Movie: film.Title, Input: '0' }); }
-            result.push({ Movie: film.Title, Input: '0' });
-            result.push({ Movie: film.Title, Input: '0' });
-            //console.log(result);
-        }
-        const worksheet = xl.utils.json_to_sheet(result)
-        const workBook = xl.utils.book_new();
-
-        xl.utils.book_append_sheet(workBook, worksheet, "records");
-        xl.write(workBook, { bookType: "xlsx", type: 'binary' })
-        xl.writeFile(workBook, "mrecord.xlsx")
-        console.log("end reading");
-    })
-
- */
 
