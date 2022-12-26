@@ -19,6 +19,8 @@ void setup()
   nodemcu.begin(9600);
  
   // Cau hinh sensor
+  pinMode(8,OUTPUT);
+  digitalWrite(8,LOW);
   pulseSensor.analogInput(PulseWire);
   pulseSensor.blinkOnPulse(LED13);       // Thiet nap den nhay khi co nhip tim
   pulseSensor.setThreshold(Threshold);
@@ -36,6 +38,7 @@ void loop()
   if(myBPM>200) myBPM = 190 + random(1,10);
   if (pulseSensor.sawStartOfBeat()) // Kiem tra neu phat hien duoc nhip tim
   {
+    digitalWrite(8,HIGH);
     Serial.println("♥  A HeartBeat Happened ! "); //In ra cong serial
     Serial.print("BPM: ");
     Serial.println(myBPM);                        // In gia tri BPM
@@ -46,5 +49,6 @@ void loop()
     cmessage = "";
     Serial.println();
   }
+  digitalWrite(8,LOW);
   delay(500);
 }

@@ -10,8 +10,8 @@
 
 #define FIREBASE_HOST "https://iot2022-cad90-default-rtdb.asia-southeast1.firebasedatabase.app/"
 #define FIREBASE_AUTH "CSOuyFgCrCgrVMLjxpFM8dBW3C14ekMXDNtO2I9g"
-#define WIFI_SSID "lau a"
-#define WIFI_PASSWORD "12345678"
+#define WIFI_SSID "Aries__21"
+#define WIFI_PASSWORD "012346789"
 FirebaseData firebaseData;
 FirebaseJson firebaseJson;
 SoftwareSerial s(D6,D5);
@@ -49,12 +49,20 @@ void setup() {
      delay(1000);
   }
   Serial.println("\nTime response....OK");  
+  //----------set up firebase------------
+  //----------xoa du lieu lan do truoc di-----------
   //-----------TIME-------------- 
 }
 
 void loop() {
   // s.write("s");
-  if(s.available()>0){
+  int param = 0;
+  if(Firebase.getInt(firebaseData,"/heart/init/run")){
+    if (firebaseData.dataTypeEnum() == fb_esp_rtdb_data_type_integer) {
+      param = firebaseData.to<int>();
+    }
+  }
+  if(s.available()>0 && param==1){
     data = s.readStringUntil('\r');
     if(data!=""){
       s.end() ;
